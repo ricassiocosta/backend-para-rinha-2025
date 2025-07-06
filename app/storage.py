@@ -46,7 +46,6 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         base += " GROUP BY processor"
         rows = (await db.execute(text(base), params)).mappings().all()
 
-    # default zeros
     summary = {
         "default": {"totalRequests": 0, "totalAmount": 0.0},
         "fallback": {"totalRequests": 0, "totalAmount": 0.0},
@@ -55,3 +54,8 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         summary[r["processor"]]["totalRequests"] = r["total_requests"]
         summary[r["processor"]]["totalAmount"] = float(r["total_amount"])
     return summary
+
+async def purge_payments():
+    async with SessionLocal() as db:
+        await db.execute(text("DELETE FROM payments"))
+        await db.commit()
