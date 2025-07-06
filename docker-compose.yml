@@ -1,0 +1,80 @@
+services:
+  backend:
+    build: .
+    container_name: rinha-backend
+    environment:
+      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - backend
+      - payment-processor
+    ports:
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.6"
+          memory: "256MB"
+
+  worker:
+    build: .
+    container_name: rinha-worker
+    command: ["python", "-m", "app.worker"]
+    environment:
+      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: "0.6"
+          memory: "256MB"
+
+  redis:
+    image: redis:7-alpine
+    container_name: rinha-redis
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: "32MB"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rinha-postgres
+    environment:
+      POSTGRES_USER: rinha
+      POSTGRES_PASSWORD: rinha
+      POSTGRES_DB: rinha
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "64MB"
+
+networks:
+  backend:
+  payment-processor:
+    external: true
+
+volumes:
+  pgdata:
