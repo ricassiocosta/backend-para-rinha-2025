@@ -4,6 +4,7 @@ from sqlalchemy import text
 from datetime import datetime
 from app.models import PaymentInDB
 from app.config import get_settings
+from app.health import _cache
 
 settings = get_settings()
 engine = create_async_engine(settings.database_url, pool_size=20, max_overflow=0)
@@ -59,3 +60,4 @@ async def purge_payments():
     async with SessionLocal() as db:
         await db.execute(text("DELETE FROM payments"))
         await db.commit()
+        _cache.clear()

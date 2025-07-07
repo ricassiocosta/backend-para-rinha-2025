@@ -12,6 +12,7 @@ async def add_payment(p: PaymentRequest):
 
 async def get_batch(count: int = 100):
     entries = await redis.xread({STREAM: "0"}, count=count, block=1000)
+    print(f"Fetched {len(entries)} entries from stream {STREAM}")
     if not entries:
         return []
     _, items = entries[0]

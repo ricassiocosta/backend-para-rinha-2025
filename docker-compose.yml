@@ -2,6 +2,7 @@ services:
   backend:
     build: .
     container_name: rinha-backend
+    restart: unless-stopped
     environment:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
@@ -25,6 +26,7 @@ services:
     build: .
     container_name: rinha-worker
     command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
     environment:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
@@ -45,6 +47,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: rinha-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     networks:
       - backend
     deploy:
@@ -56,6 +60,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: rinha-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: rinha
       POSTGRES_PASSWORD: rinha
