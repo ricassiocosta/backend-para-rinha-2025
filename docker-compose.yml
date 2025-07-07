@@ -20,7 +20,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "64MB"
+          memory: "128MB"
 
   worker-1:
     build: .
@@ -44,7 +44,7 @@ services:
           # cpus: "0.2"
           # memory: "64MB"
           cpus: "0.3"
-          memory: "96MB"
+          memory: "64MB"
 
   worker-2:
     build: .
@@ -68,7 +68,7 @@ services:
           # cpus: "0.2"
           # memory: "64MB"
           cpus: "0.3"
-          memory: "96MB"
+          memory: "64MB"
 
   redis:
     image: redis:7-alpine

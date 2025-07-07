@@ -8,8 +8,8 @@ import uvicorn
 app = FastAPI(title="Rinha Backend - Python")
 
 @app.post("/payments", status_code=202)
-async def queue_payment(p: PaymentRequest):
-    await add_payment(p)
+async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(add_payment, p)
     return {"status": "queued"}
 
 @app.get("/payments-summary")

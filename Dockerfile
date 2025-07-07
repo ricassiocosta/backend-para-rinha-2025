@@ -11,4 +11,4 @@ COPY app ./app
 COPY migrations ./migrations
 
 EXPOSE 9999
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9999"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9999", "--workers", "2"]

@@ -47,7 +47,7 @@ async def get_healthier_gateway() -> tuple[str, str]:
                 except Exception:
                     pass
             default_health = await get_health(settings.pp_default)
-            if not default_health["failing"] and default_health["minResponseTime"] <= settings.pp_timeout_ms:
+            if not default_health["failing"] and not (default_health["minResponseTime"] > settings.pp_max_timeout_allowed):
                 cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
                 await redis.set(_CACHE_KEY, json.dumps(cache_obj), ex=settings.health_cache_ttl)
                 return settings.pp_default, "default"
@@ -70,6 +70,6 @@ async def get_healthier_gateway() -> tuple[str, str]:
                 except Exception:
                     pass
         default_health = await get_health(settings.pp_default)
-        if not default_health["failing"] and default_health["minResponseTime"] <= settings.pp_timeout_ms:
+        if not default_health["failing"] and not (default_health["minResponseTime"] > settings.pp_max_timeout_allowed):
             return settings.pp_default, "default"
         return settings.pp_fallback, "fallback"

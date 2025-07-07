@@ -13,7 +13,7 @@ async def send_payment(dest: str, cid: UUID, amount: float) -> bool:
         "amount": amount,
         "requestedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
-    async with httpx.AsyncClient(timeout=1.5) as client:
+    async with httpx.AsyncClient(timeout=0.5) as client:
         r = await client.post(f"{dest}/payments", json=payload)
         return r.status_code < 300
 

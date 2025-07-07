@@ -8,7 +8,7 @@ class Settings:
     pp_fallback: str = os.getenv("PAYMENT_PROCESSOR_URL_FALLBACK")
     health_cache_ttl: int = 5
     worker_batch_size: int = 100
-    pp_timeout_ms: int = 120
+    pp_max_timeout_allowed: int = 300
 
 @lru_cache
 def get_settings() -> Settings:

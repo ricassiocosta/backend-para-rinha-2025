@@ -6,7 +6,7 @@ from app.models import PaymentInDB
 from app.config import get_settings
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=0, pool_pre_ping=True)
+engine = create_async_engine(settings.database_url, pool_size=500, max_overflow=10, pool_pre_ping=True)
 SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 async def save_payment(p: PaymentInDB):
