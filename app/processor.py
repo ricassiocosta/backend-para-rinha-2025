@@ -6,7 +6,6 @@ from app.config import get_settings
 from uuid import UUID
 
 settings = get_settings()
-_MAX_RETRIES = 3
 
 async def send_payment(dest: str, cid: UUID, amount: float) -> bool:
     payload = {
@@ -14,21 +13,23 @@ async def send_payment(dest: str, cid: UUID, amount: float) -> bool:
         "amount": amount,
         "requestedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
-    async with httpx.AsyncClient(timeout=3) as client:
+    async with httpx.AsyncClient(timeout=1.5) as client:
         r = await client.post(f"{dest}/payments", json=payload)
         return r.status_code < 300
 
 async def choose_and_send(cid: UUID, amount: float) -> str:
-    for _ in range(_MAX_RETRIES):
-        try:
-            healthier_gateway, gateway_name = await get_healthier_gateway()
-        except Exception as e:
-            print(f"Error getting healthier gateway: {e}")
-            continue
+    try:
+        healthier_gateway, gateway_name = await get_healthier_gateway()
+    except Exception as e:
+        print(f"Error getting healthier gateway: {e}")
 
+    try:
         if await send_payment(healthier_gateway, cid, amount):
             return gateway_name
-        
-        time.sleep(0.1)
-    
-    raise RuntimeError("Failed to send payment after retries")
+        raise
+    except Exception as e:
+        fallback_gateway = settings.pp_fallback if healthier_gateway == settings.pp_default else settings.pp_default
+        if await send_payment(fallback_gateway, cid, amount):
+            return gateway_name
+
+        raise RuntimeError("Failed to send payment after retries")

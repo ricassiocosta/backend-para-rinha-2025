@@ -21,6 +21,28 @@ async def payments_summary(from_: str | None = None, to: str | None = None):
         raise HTTPException(status_code=400, detail="invalid timestamp format")
     return await get_summary(ts_from, ts_to)
 
+@app.get("/payments/{correlation_id}")
+async def get_payment_status(correlation_id: str):
+    from app.storage import SessionLocal
+    from sqlalchemy import text
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            text("SELECT * FROM payments WHERE correlation_id = :cid"),
+            {"cid": correlation_id}
+        )
+        payment = result.mappings().first()
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    return {
+        "correlationId": payment["correlation_id"],
+        "amount": payment["amount"],
+        "processor": payment["processor"],
+        "requestedAt": payment["requested_at"].isoformat(),
+    }
+
 @app.post("/purge-payments")
 async def purge_payments_endpoint():
     await purge_payments()
