@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS payments (
     requested_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_requested_at
-    ON payments (requested_at);
+CREATE INDEX IF NOT EXISTS idx_payments_processor_requested_at
+    ON payments (processor, requested_at);

@@ -6,7 +6,7 @@ class Settings:
     database_url: str = os.getenv("DATABASE_URL")
     pp_default: str = os.getenv("PAYMENT_PROCESSOR_URL_DEFAULT")
     pp_fallback: str = os.getenv("PAYMENT_PROCESSOR_URL_FALLBACK")
-    health_cache_ttl: int = 5
+    health_cache_ttl: int = 6
     worker_batch_size: int = 100
     pp_max_timeout_allowed: int = 300
 

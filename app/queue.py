@@ -6,12 +6,12 @@ from app.models import PaymentRequest
 import asyncio
 
 settings = get_settings()
-redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=1000)
+redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=100)
 
 STREAM = "payments_stream"
 GROUP = "payment_consumers"
 CONSUMER = "worker-1" 
-MAX_PARALLELISM = 4
+MAX_PARALLELISM = 10
 
 async def setup_stream():
     try:

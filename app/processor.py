@@ -1,5 +1,4 @@
-import time
-import httpx, asyncio
+import httpx
 from datetime import datetime, timezone
 from app.health import get_healthier_gateway
 from app.config import get_settings
@@ -13,7 +12,8 @@ async def send_payment(dest: str, cid: UUID, amount: float) -> bool:
         "amount": amount,
         "requestedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
-    async with httpx.AsyncClient(timeout=0.5) as client:
+    timeout = httpx.Timeout(1.5, read=0.2, connect=0.1, write=1.5)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(f"{dest}/payments", json=payload)
         return r.status_code < 300
 
