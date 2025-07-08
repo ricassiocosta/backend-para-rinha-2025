@@ -12,7 +12,7 @@ async def send_payment(dest: str, cid: UUID, amount: float) -> bool:
         "amount": amount,
         "requestedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
-    timeout = httpx.Timeout(1.5, read=0.2, connect=0.1, write=1.5)
+    timeout = httpx.Timeout(1.5)
     async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(f"{dest}/payments", json=payload)
         return r.status_code < 300
@@ -26,10 +26,10 @@ async def choose_and_send(cid: UUID, amount: float) -> str:
     try:
         if await send_payment(healthier_gateway, cid, amount):
             return gateway_name
-        raise
+        raise RuntimeError("Default processor failed")
     except Exception as e:
         fallback_gateway = settings.pp_fallback if healthier_gateway == settings.pp_default else settings.pp_default
         if await send_payment(fallback_gateway, cid, amount):
-            return gateway_name
+            return "fallback" if fallback_gateway == settings.pp_fallback else "default"
 
         raise RuntimeError("Failed to send payment after retries")

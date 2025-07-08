@@ -11,7 +11,7 @@ redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connect
 STREAM = "payments_stream"
 GROUP = "payment_consumers"
 CONSUMER = "worker-1" 
-MAX_PARALLELISM = 10
+MAX_PARALLELISM = 16
 
 async def setup_stream():
     try:

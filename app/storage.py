@@ -6,8 +6,8 @@ from app.models import PaymentInDB
 from app.config import get_settings
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=5, pool_pre_ping=True)
-SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=0, pool_pre_ping=True)
+SessionLocal = sessionmaker(engine, expire_on_commit=True, class_=AsyncSession)
 
 async def save_payment(p: PaymentInDB):
     async with SessionLocal() as db:
@@ -28,11 +28,13 @@ async def save_payment(p: PaymentInDB):
 
 async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
     async with SessionLocal() as db:
-        base = (
-            "SELECT processor, COUNT(*) total_requests, "
-            "COALESCE(SUM(amount),0) total_amount "
-            "FROM payments "
-        )
+        await db.execute(text("SET TIME ZONE 'UTC'"))
+
+        base = """
+            SELECT processor, COUNT(*) total_requests, 
+                   COALESCE(SUM(amount),0) total_amount
+            FROM payments
+        """
         where = []
         params = {}
         if ts_from:
@@ -44,6 +46,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         if where:
             base += "WHERE " + " AND ".join(where)
         base += " GROUP BY processor"
+
         rows = (await db.execute(text(base), params)).mappings().all()
 
     summary = {
@@ -51,8 +54,10 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         "fallback": {"totalRequests": 0, "totalAmount": 0.0},
     }
     for r in rows:
-        summary[r["processor"]]["totalRequests"] = r["total_requests"]
-        summary[r["processor"]]["totalAmount"] = float(r["total_amount"])
+        processor = r["processor"]
+        if processor in summary:
+            summary[processor]["totalRequests"] = r["total_requests"]
+            summary[processor]["totalAmount"] = float(r["total_amount"])
     return summary
 
 async def purge_payments():
