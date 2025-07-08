@@ -32,6 +32,7 @@ services:
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
+      - CONSUMER_NAME=worker-1
     depends_on:
       - redis
       - postgres
@@ -41,8 +42,31 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.8"
-          memory: "128MB"
+          cpus: "0.4"
+          memory: "64MB"
+
+  worker-2:
+    build: .
+    container_name: rinha-worker-2
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment:
+      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
+      - CONSUMER_NAME=worker-2
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: "0.4"
+          memory: "64MB"
 
   redis:
     image: redis:7-alpine
