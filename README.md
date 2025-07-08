@@ -6,38 +6,19 @@ Este repositório contém a implementação de um backend para o desafio "Rinha 
 
 O sistema é responsável por processar pagamentos de forma resiliente, utilizando múltiplos gateways e realizando fallback automático em caso de falha. Ele também expõe endpoints para monitoramento de saúde e integrações externas.
 
-## Arquitetura do Projeto
+## Recursos Alocados (docker-compose)
 
-```
-+---------+        +-------+         +--------+
-|  API    |<-----> | Queue | <-----> | Worker |
-+---------+        +-------+         +--------+
-                                      ^   |
-                                      |   v
-                                    +--------+
-                                    |Health  |
-                                    +--------+
-                                      ^   |
-                                      |   v
-                                    +-------+
-                                    | Cache |
-                                    +-------+
-                                        |
-                                        v
-                 +-------------------+     +-------------------+
-                 | Payment Processor |     | Payment Processor |
-                 |        1          |     |        2          |
-                 +-------------------+     +-------------------+
-```
-
-- **Cliente**: Usuário ou sistema externo que faz requisições de pagamento.
-- **API (FastAPI)**: Recebe as requisições e orquestra o fluxo.
-- **Processor**: Processa e envia pedidos para a fila.
-- **Fila (Redis)**: Armazena pedidos de pagamento de forma assíncrona.
-- **Worker**: Consome a fila e executa o processamento dos pagamentos.
-- **Health**: Verifica a saúde dos gateways.
-- **Storage**: Persistência dos dados.
-- **Gateways**: Serviços externos de pagamento (Default e Fallback).
+| Serviço       | CPUs | Memória |
+| ------------- | ---- | ------- |
+| nginx         | 0.2  | 32MB    |
+| backend-api-1 | 0.2  | 65MB    |
+| backend-api-2 | 0.2  | 65MB    |
+| worker-1      | 0.35 | 64MB    |
+| worker-2      | 0.35 | 64MB    |
+| redis         | 0.05 | 16MB    |
+| postgres      | 0.05 | 32MB    |
+| health-worker | 0.1  | 12MB    |
+| **Total**     | 1.5  | 350MB   |
 
 ## Estrutura do Projeto
 
