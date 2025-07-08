@@ -8,6 +8,7 @@ import uuid
 settings = get_settings()
 redis = aioredis.from_url(settings.redis_url, decode_responses=True)
 _CACHE_KEY = "gateway_status"
+_LOCAL_CACHE = {}
 
 def is_cache_valid(ts: float) -> bool:
     now = datetime.now().timestamp()
@@ -24,6 +25,11 @@ async def get_health(url: str) -> dict:
         return data
 
 async def get_healthier_gateway() -> tuple[str, str]:
+    cached = _LOCAL_CACHE.get(_CACHE_KEY)
+    if cached:
+        if is_cache_valid(cached["ts"]):
+            return tuple(cached["data"])
+        
     cached = await redis.get(_CACHE_KEY)
     if cached:
         try:
@@ -54,12 +60,14 @@ async def get_healthier_gateway() -> tuple[str, str]:
             if not default_health["failing"] and default_health["minResponseTime"] < 120:
                 cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
                 await redis.set(_CACHE_KEY, json.dumps(cache_obj), ex=settings.health_cache_ttl)
+                _LOCAL_CACHE[_CACHE_KEY] = cache_obj
                 return settings.pp_default, "default"
             
             
             if fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 3) :
                 cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": datetime.now().timestamp()}
                 await redis.set(_CACHE_KEY, json.dumps(cache_obj), ex=settings.health_cache_ttl)
+                _LOCAL_CACHE[_CACHE_KEY] = cache_obj
                 return settings.pp_fallback, "fallback"
             
             cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
@@ -80,7 +88,7 @@ async def get_healthier_gateway() -> tuple[str, str]:
                         return tuple(cached_obj["data"])
                 except Exception:
                     pass
-        default_health = await get_health(settings.pp_default)
-        if not default_health["failing"] and not (default_health["minResponseTime"] > settings.pp_max_timeout_allowed):
-            return settings.pp_default, "default"
-        return settings.pp_fallback, "fallback"
+
+        if cached:
+            cached_obj = json.loads(cached)
+            return tuple(cached_obj["data"])

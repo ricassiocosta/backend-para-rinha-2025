@@ -27,12 +27,15 @@ async def save_payment(p: PaymentInDB):
         await db.commit()
 
 async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
-    async with SessionLocal() as db:
-        await db.execute(text("SET TIME ZONE 'UTC'"))
+    # cache_key = f"summary:{ts_from.isoformat() if ts_from else 'null'}:{ts_to.isoformat() if ts_to else 'null'}"
+    # cached = await redis.get(cache_key)
+    # if cached:
+    #     return json.loads(cached)
 
+    async with SessionLocal() as db:
         base = """
-            SELECT processor, COUNT(*) total_requests, 
-                   COALESCE(SUM(amount),0) total_amount
+            SELECT processor, COUNT(*) AS total_requests, 
+                   SUM(amount)::float AS total_amount
             FROM payments
         """
         where = []
@@ -44,7 +47,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
             where.append("requested_at <= :to")
             params["to"] = ts_to
         if where:
-            base += "WHERE " + " AND ".join(where)
+            base += " WHERE " + " AND ".join(where)
         base += " GROUP BY processor"
 
         rows = (await db.execute(text(base), params)).mappings().all()
@@ -57,7 +60,9 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         processor = r["processor"]
         if processor in summary:
             summary[processor]["totalRequests"] = r["total_requests"]
-            summary[processor]["totalAmount"] = float(r["total_amount"])
+            summary[processor]["totalAmount"] = r["total_amount"] or 0.0
+
+    # await redis.set(cache_key, json.dumps(summary), ex=5)
     return summary
 
 async def purge_payments():

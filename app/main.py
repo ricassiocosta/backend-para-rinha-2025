@@ -3,6 +3,8 @@ from app.queue import add_payment
 from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
 from datetime import datetime
+from app.storage import SessionLocal
+from sqlalchemy import text
 import uvicorn
 
 app = FastAPI(title="Rinha Backend - Python")
@@ -31,9 +33,6 @@ async def payments_summary(from_: str | None = Query(default=None, alias="from")
 
 @app.get("/payments/{correlation_id}")
 async def get_payment_status(correlation_id: str):
-    from app.storage import SessionLocal
-    from sqlalchemy import text
-
     async with SessionLocal() as db:
         result = await db.execute(
             text("SELECT * FROM payments WHERE correlation_id = :cid"),
