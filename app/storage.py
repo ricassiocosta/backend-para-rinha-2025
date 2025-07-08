@@ -42,7 +42,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
             where.append("requested_at >= :from")
             params["from"] = ts_from
         if ts_to:
-            where.append("requested_at <= :to")
+            where.append("requested_at < :to")
             params["to"] = ts_to
         if where:
             base += " WHERE " + " AND ".join(where)

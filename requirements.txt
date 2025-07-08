@@ -7,3 +7,4 @@ redis==6.2.0
 SQLAlchemy==2.0.41
 uvicorn==0.35.0
 asyncpg>=0.29
+requests

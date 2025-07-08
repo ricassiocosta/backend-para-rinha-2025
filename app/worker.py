@@ -15,7 +15,9 @@ async def handle_item(item: dict):
     try:
         p = PaymentRequest(**item)
         processor = await choose_and_send(p.correlationId, p.amount)
-
+        if not processor:
+            return
+        
         await save_payment(
             PaymentInDB(
                 correlation_id=p.correlationId,
