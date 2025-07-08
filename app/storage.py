@@ -7,23 +7,21 @@ from app.config import get_settings
 
 settings = get_settings()
 engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=0, pool_pre_ping=True)
-SessionLocal = sessionmaker(engine, expire_on_commit=True, class_=AsyncSession)
+SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+insert_stmt = text("""
+    INSERT INTO payments (correlation_id, amount, processor, requested_at)
+    VALUES (:cid, :amount, :processor, :requested_at)
+""")
 
 async def save_payment(p: PaymentInDB):
     async with SessionLocal() as db:
-        await db.execute(
-            text(
-                "INSERT INTO payments "
-                "(correlation_id, amount, processor, requested_at) "
-                "VALUES (:cid, :amount, :processor, :requested_at)"
-            ),
-            dict(
-                cid=str(p.correlation_id),
-                amount=p.amount,
-                processor=p.processor,
-                requested_at=p.requested_at,
-            ),
-        )
+        await db.execute(insert_stmt, {
+            "cid": p.correlation_id,
+            "amount": p.amount,
+            "processor": p.processor,
+            "requested_at": p.requested_at,
+        })
         await db.commit()
 
 async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
