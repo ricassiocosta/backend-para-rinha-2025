@@ -16,8 +16,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "32MB"
+          cpus: "0.1"
+          memory: "12MB"
 
   backend-api-1:
     build: .
@@ -36,15 +36,11 @@ services:
       - payment-processor
     expose:
       - "9999"
-    # ports:
-    #   - "9999:9999"
     deploy:
       resources:
         limits:
-          # cpus: "0.15"
-          # memory: "64MB"
-          cpus: "0.2"
-          memory: "65MB"
+          cpus: "0.1"
+          memory: "40MB"
 
   backend-api-2:
     build: .
@@ -66,12 +62,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "65MB"
+          cpus: "0.1"
+          memory: "40MB"
 
-  worker-1:
+  worker:
     build: .
-    container_name: rinha-worker-1
+    container_name: rinha-worker
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
     environment:
@@ -79,7 +75,8 @@ services:
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
-      - CONSUMER_NAME=worker-1
+      - CONSUMER_NAME=worker
+      - MAX_PARALLELISM=64
     depends_on:
       - redis
       - postgres
@@ -89,72 +86,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: "64MB"
-
-  worker-2:
-    build: .
-    container_name: rinha-worker-2
-    command: ["python", "-m", "app.worker"]
-    restart: unless-stopped
-    environment:
-      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
-      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
-      - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://rinha:rinha@postgres:5432/rinha
-      - CONSUMER_NAME=worker-2
-    depends_on:
-      - redis
-      - postgres
-    networks:
-      - backend
-      - payment-processor
-    deploy:
-      resources:
-        limits:
-          cpus: "0.35"
-          memory: "64MB"
-
-  redis:
-    image: redis:7-alpine
-    container_name: rinha-redis
-    restart: unless-stopped
-    command:
-      [
-        "redis-server",
-        "--save",
-        "",
-        "--appendonly",
-        "no",
-        "--maxclients",
-        "10000",
-      ]
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.05"
-          memory: "16MB"
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: rinha-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: rinha
-      POSTGRES_PASSWORD: rinha
-      POSTGRES_DB: rinha
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.05"
-          memory: "32MB"
+          cpus: "0.95"
+          memory: "120MB"
 
   health-worker:
     build: .
@@ -176,11 +109,60 @@ services:
           cpus: "0.1"
           memory: "12MB"
 
+  redis:
+    image: redis:7-alpine
+    container_name: rinha-redis
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxclients",
+        "15000",
+      ]
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.05"
+          memory: "10MB"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rinha-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rinha
+      POSTGRES_PASSWORD: rinha
+      POSTGRES_DB: rinha
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d
+    command: >
+      postgres
+      -c fsync=off
+      -c autovacuum=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c max_wal_senders=0
+      -c wal_level=minimal
+      -c shared_buffers=32MB
+      -c work_mem=1MB
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: "116MB"
+
 networks:
   backend:
     driver: bridge
   payment-processor:
     external: true
-
-volumes:
-  pgdata:

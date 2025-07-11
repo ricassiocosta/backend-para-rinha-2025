@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import redis.asyncio as aioredis
 from redis.exceptions import ResponseError
@@ -7,12 +8,12 @@ from app.models import PaymentRequest
 import asyncio
 
 settings = get_settings()
-redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=100)
+redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=15000)
 
 STREAM = "payments_stream"
 GROUP = "payment_consumers"
 CONSUMER = os.getenv("CONSUMER_NAME", "worker-default")
-MAX_PARALLELISM = 8
+MAX_PARALLELISM = int(os.getenv("MAX_PARALLELISM", 10))
 
 async def setup_stream():
     try:
@@ -44,7 +45,6 @@ async def consume_loop(handle_item):
             consumername=CONSUMER,
             streams={STREAM: ">"},
             count=MAX_PARALLELISM,
-            block=2000 
         )
 
         if not entries:

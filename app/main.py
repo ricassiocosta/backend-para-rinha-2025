@@ -1,4 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
+from fastapi.responses import ORJSONResponse
 from app.queue import add_payment
 from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
@@ -7,18 +8,7 @@ from app.storage import SessionLocal
 from sqlalchemy import text
 import uvicorn
 
-app = FastAPI(title="Rinha Backend - Python")
-
-from datetime import datetime, timezone
-
-def parse_iso_ts(ts: str) -> datetime:
-    try:
-        if ts.endswith("Z"):
-            ts = ts.replace("Z", "+00:00")
-        return datetime.fromisoformat(ts)
-    except Exception:
-        raise HTTPException(status_code=400, detail="invalid timestamp format")
-
+app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)
 async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
@@ -27,9 +17,7 @@ async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
 
 @app.get("/payments-summary")
 async def payments_summary(from_: str | None = Query(default=None, alias="from"), to: str | None = None):
-    ts_from = parse_iso_ts(from_) if from_ else None
-    ts_to = parse_iso_ts(to) if to else None
-    return await get_summary(ts_from, ts_to)
+    return await get_summary(datetime.fromisoformat(from_), datetime.fromisoformat(to))
 
 @app.get("/payments/{correlation_id}")
 async def get_payment_status(correlation_id: str):

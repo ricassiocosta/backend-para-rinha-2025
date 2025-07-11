@@ -6,7 +6,7 @@ from app.models import PaymentInDB
 from app.config import get_settings
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=0, pool_pre_ping=True)
+engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=5, pool_pre_ping=True)
 SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 insert_stmt = text("""
@@ -25,11 +25,6 @@ async def save_payment(p: PaymentInDB):
         await db.commit()
 
 async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
-    # cache_key = f"summary:{ts_from.isoformat() if ts_from else 'null'}:{ts_to.isoformat() if ts_to else 'null'}"
-    # cached = await redis.get(cache_key)
-    # if cached:
-    #     return json.loads(cached)
-
     async with SessionLocal() as db:
         base = """
             SELECT processor, COUNT(*) AS total_requests, 
@@ -42,7 +37,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
             where.append("requested_at >= :from")
             params["from"] = ts_from
         if ts_to:
-            where.append("requested_at < :to")
+            where.append("requested_at <= :to")
             params["to"] = ts_to
         if where:
             base += " WHERE " + " AND ".join(where)
@@ -60,7 +55,6 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
             summary[processor]["totalRequests"] = r["total_requests"]
             summary[processor]["totalAmount"] = r["total_amount"] or 0.0
 
-    # await redis.set(cache_key, json.dumps(summary), ex=5)
     return summary
 
 async def purge_payments():
