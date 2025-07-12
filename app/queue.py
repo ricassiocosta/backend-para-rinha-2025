@@ -35,14 +35,14 @@ async def consume_loop(handle_item):
                 await handle_item(data)
                 await redis.xack(STREAM, GROUP, entry_id)
             except Exception as e:
-                print(f"Erro ao processar {entry_id}: {e}")
+                print(e)
 
     while True:
         entries = await redis.xreadgroup(
             groupname=GROUP,
             consumername=CONSUMER,
             streams={STREAM: ">"},
-            count=(MAX_PARALLELISM * 2),  # Read more to allow for parallel processing
+            count=(MAX_PARALLELISM * 2),
         )
 
         if not entries:
@@ -57,4 +57,4 @@ async def consume_loop(handle_item):
                         parsed = orjson.loads(raw)
                         tg.create_task(handle_with_ack(entry_id, parsed))
                     except Exception as e:
-                        print(f"Erro ao decodificar item {entry_id}: {e}")
+                        print(e)

@@ -36,8 +36,7 @@ async def choose_and_send(cid: str, amount: float):
             return
         print(f"Failed to send payment to {healthier_gateway} for {cid}")
     except Exception as e:
-        print(f"Failed to send payment to {healthier_gateway} for {cid}")
-        raise e
+        raise RuntimeError(f"Error while sending payment: {e}")
     
     raise Exception(f"Failed to send payment to {healthier_gateway} for {cid}")
 
