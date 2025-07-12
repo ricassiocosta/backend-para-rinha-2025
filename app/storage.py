@@ -1,63 +1,49 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
 from datetime import datetime
 from app.models import PaymentInDB
 from app.config import get_settings
+import json
+import redis.asyncio as aioredis
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_size=100, max_overflow=5, pool_pre_ping=True)
-SessionLocal = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-
-insert_stmt = text("""
-    INSERT INTO payments (correlation_id, amount, processor, requested_at)
-    VALUES (:cid, :amount, :processor, :requested_at)
-""")
+redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
 
 async def save_payment(p: PaymentInDB):
-    async with SessionLocal() as db:
-        await db.execute(insert_stmt, {
-            "cid": p.correlation_id,
-            "amount": p.amount,
-            "processor": p.processor,
-            "requested_at": p.requested_at,
-        })
-        await db.commit()
+    payment_json = json.dumps({
+        "correlation_id": str(p.correlation_id),
+        "amount": p.amount,
+        "processor": p.processor,
+        "requested_at": p.requested_at.isoformat() if isinstance(p.requested_at, datetime) else p.requested_at,
+    })
+    await redis_client.rpush("payments", payment_json)
 
 async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
-    async with SessionLocal() as db:
-        base = """
-            SELECT processor, COUNT(*) AS total_requests, 
-                   SUM(amount) AS total_amount
-            FROM payments
-        """
-        where = []
-        params = {}
-        if ts_from:
-            where.append("requested_at >= :from")
-            params["from"] = ts_from
-        if ts_to:
-            where.append("requested_at < :to")
-            params["to"] = ts_to
-        if where:
-            base += " WHERE " + " AND ".join(where)
-        base += " GROUP BY processor"
-
-        rows = (await db.execute(text(base), params)).mappings().all()
-
+    payments = await redis_client.lrange("payments", 0, -1)
     summary = {
         "default": {"totalRequests": 0, "totalAmount": 0.0},
         "fallback": {"totalRequests": 0, "totalAmount": 0.0},
     }
-    for r in rows:
-        processor = r["processor"]
+    for payment_json in payments:
+        p = json.loads(payment_json)
+        requested_at = datetime.fromisoformat(p["requested_at"])
+        if requested_at.tzinfo is not None:
+            requested_at = requested_at.replace(tzinfo=None)
+        if ts_from and ts_from.tzinfo is not None:
+            ts_from_naive = ts_from.replace(tzinfo=None)
+        else:
+            ts_from_naive = ts_from
+        if ts_to and ts_to.tzinfo is not None:
+            ts_to_naive = ts_to.replace(tzinfo=None)
+        else:
+            ts_to_naive = ts_to
+        if ts_from_naive and requested_at < ts_from_naive:
+            continue
+        if ts_to_naive and requested_at >= ts_to_naive:
+            continue
+        processor = p["processor"]
         if processor in summary:
-            summary[processor]["totalRequests"] = r["total_requests"]
-            summary[processor]["totalAmount"] = r["total_amount"] or 0.0
-
+            summary[processor]["totalRequests"] += 1
+            summary[processor]["totalAmount"] += float(p["amount"])
     return summary
 
 async def purge_payments():
-    async with SessionLocal() as db:
-        await db.execute(text("DELETE FROM payments"))
-        await db.commit()
+    await redis_client.delete("payments")
