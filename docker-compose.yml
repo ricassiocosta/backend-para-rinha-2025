@@ -21,6 +21,7 @@ services:
 
   backend-api-1:
     build: .
+    image: ricassiocosta/rinha-backend-2025-python:latest
     container_name: rinha-backend-api-1
     restart: unless-stopped
     environment:
@@ -42,6 +43,7 @@ services:
 
   backend-api-2:
     build: .
+    image: ricassiocosta/rinha-backend-2025-python:latest
     container_name: rinha-backend-api-2
     restart: unless-stopped
     environment:
@@ -63,6 +65,7 @@ services:
 
   worker-light:
     build: .
+    image: ricassiocosta/rinha-backend-2025-python:latest
     container_name: worker-light
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
@@ -85,6 +88,7 @@ services:
 
   worker-heavy:
     build: .
+    image: ricassiocosta/rinha-backend-2025-python:latest
     container_name: worker-heavy
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
@@ -107,6 +111,7 @@ services:
 
   health-check:
     build: .
+    image: ricassiocosta/rinha-backend-2025-python:latest
     container_name: rinha-health-check
     command: ["python", "-m", "app.health_check"]
     restart: unless-stopped
