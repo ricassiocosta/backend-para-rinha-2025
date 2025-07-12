@@ -4,20 +4,23 @@ Este repositório contém a implementação de um backend para o desafio "Rinha 
 
 ## Descrição
 
-O sistema é responsável por processar pagamentos de forma resiliente, utilizando múltiplos gateways e realizando fallback automático em caso de falha. Ele também expõe endpoints para monitoramento de saúde e integrações externas.
+O sistema é responsável por processar pagamentos de forma resiliente, utilizando múltiplos gateways e realizando fallback automático em caso de falha.
+
+## Arquitetura
+
+![architecture](./docs/architecture.png)
 
 ## Recursos Alocados (docker-compose)
 
 | Serviço       | CPUs | Memória |
 | ------------- | ---- | ------- |
-| nginx         | 0.2  | 32MB    |
-| backend-api-1 | 0.2  | 65MB    |
-| backend-api-2 | 0.2  | 65MB    |
-| worker-1      | 0.35 | 64MB    |
-| worker-2      | 0.35 | 64MB    |
-| redis         | 0.05 | 16MB    |
-| postgres      | 0.05 | 32MB    |
-| health-worker | 0.1  | 12MB    |
+| nginx         | 0.1  | 16MB    |
+| backend-api-1 | 0.1  | 64MB    |
+| backend-api-2 | 0.1  | 64MB    |
+| worker-light  | 0.3  | 48MB    |
+| worker-heavy  | 0.7  | 80MB    |
+| health-worker | 0.1  | 14MB    |
+| redis         | 0.1  | 64MB    |
 | **Total**     | 1.5  | 350MB   |
 
 ## Estrutura do Projeto
@@ -26,18 +29,17 @@ O sistema é responsável por processar pagamentos de forma resiliente, utilizan
 ├── app/
 │   ├── __init__.py
 │   ├── config.py         # Configurações do sistema
-│   ├── health.py         # Lógica de healthcheck dos gateways
-│   ├── main.py           # Ponto de entrada da aplicação
+│   ├── health_check.py   # Worker de healthcheck dos gateways
+│   ├── main.py           # Ponto de entrada da API
 │   ├── models.py         # Modelos de dados
 │   ├── processor.py      # Processamento e envio de pagamentos
 │   ├── queue.py          # Gerenciamento de filas
 │   ├── storage.py        # Persistência de dados
 │   └── worker.py         # Worker assíncrono para processamento
-├── migrations/
-│   └── 001_init.sql      # Script de criação do banco de dados
 ├── requirements.txt      # Dependências do projeto
 ├── Dockerfile            # Dockerização da aplicação
 ├── docker-compose.yml    # Orquestração de containers
+├── nginx.conf            # Configuração do Nginx
 └── LICENSE
 ```
 
