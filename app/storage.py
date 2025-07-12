@@ -28,7 +28,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
     async with SessionLocal() as db:
         base = """
             SELECT processor, COUNT(*) AS total_requests, 
-                   SUM(amount)::float AS total_amount
+                   SUM(amount) AS total_amount
             FROM payments
         """
         where = []
@@ -37,7 +37,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
             where.append("requested_at >= :from")
             params["from"] = ts_from
         if ts_to:
-            where.append("requested_at <= :to")
+            where.append("requested_at < :to")
             params["to"] = ts_to
         if where:
             base += " WHERE " + " AND ".join(where)

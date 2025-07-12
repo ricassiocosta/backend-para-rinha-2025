@@ -1,16 +1,19 @@
 import logging
 import httpx
-import asyncio
-from typing import Optional
-from datetime import datetime, timezone
-from app.health import get_healthier_gateway
-from app.config import get_settings
+import json
+import redis.asyncio as aioredis
+
 from uuid import UUID
+from datetime import datetime, timezone
 
 from app.models import PaymentInDB
+from app.config import get_settings
 from app.storage import save_payment
 
 settings = get_settings()
+redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+_CACHE_KEY = "gateway_status"
+
 logging.basicConfig(level=logging.INFO, format="[worker] %(message)s")
 
 async def send_payment(dest: str, cid: UUID, amount: float, requested_at: datetime) -> bool:
@@ -26,10 +29,6 @@ async def send_payment(dest: str, cid: UUID, amount: float, requested_at: dateti
                 r = await client.post(f"{dest}/payments", json=payload, timeout=backoff)
                 if r.status_code == 200:
                     return True
-                elif r.status_code == 500:
-                    r = await client.get(f"{dest}/payments/{cid}", json=payload, timeout=backoff)
-                    if r.status_code == 200:
-                        return True
             except httpx.TimeoutException:
                 logging.warning(f"Timeout sending payment to {dest} for {cid}, retrying...")
                 backoff *= 2
@@ -38,7 +37,7 @@ async def send_payment(dest: str, cid: UUID, amount: float, requested_at: dateti
 
 async def choose_and_send(cid: UUID, amount: float):
     try:
-        healthier_gateway, gateway_name = await get_healthier_gateway()
+        healthier_gateway, gateway_name = await _get_healthier_gateway()
         requested_at = datetime.now(tz=timezone.utc)
         if await send_payment(healthier_gateway, cid, amount, requested_at):
             await save_payment(
@@ -56,3 +55,18 @@ async def choose_and_send(cid: UUID, amount: float):
         raise e
     
     raise Exception(f"Failed to send payment to {healthier_gateway} for {cid}")
+
+def _is_cache_valid(ts: float) -> bool:
+    now = datetime.now().timestamp()
+    return (ts + settings.health_cache_ttl) > now
+
+async def _get_healthier_gateway() -> tuple[str, str]:
+    cached = await redis.get(_CACHE_KEY)
+    if cached:
+        try:
+            cached_obj = json.loads(cached)
+            if _is_cache_valid(cached_obj["ts"]):
+                return tuple(cached_obj["data"])
+        except Exception:
+            pass
+    raise RuntimeError("No valid gateway health data in cache")

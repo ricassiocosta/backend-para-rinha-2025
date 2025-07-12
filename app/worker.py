@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime
 import logging
 
 from app.queue import consume_loop

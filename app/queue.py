@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 import redis.asyncio as aioredis
 from redis.exceptions import ResponseError
@@ -59,5 +58,4 @@ async def consume_loop(handle_item):
                     tasks.append(handle_with_ack(entry_id, parsed))
                 except Exception as e:
                     print(f"Erro ao decodificar item {entry_id}: {e}")
-
         await asyncio.gather(*tasks)
