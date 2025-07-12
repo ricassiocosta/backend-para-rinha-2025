@@ -37,7 +37,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.1"
           memory: "64MB"
 
   backend-api-2:
@@ -58,20 +58,20 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.1"
           memory: "64MB"
 
-  worker-1:
+  worker-light:
     build: .
-    container_name: rinha-worker-1
+    container_name: worker-light
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
     environment:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
       - REDIS_URL=redis://redis:6379/0
-      - CONSUMER_NAME=worker-1
-      - MAX_PARALLELISM=32
+      - CONSUMER_NAME=worker-light
+      - MAX_PARALLELISM=4
     depends_on:
       - redis
     networks:
@@ -80,8 +80,30 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.8"
-          memory: "160MB"
+          cpus: "0.3"
+          memory: "48MB"
+
+  worker-heavy:
+    build: .
+    container_name: worker-heavy
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment:
+      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
+      - REDIS_URL=redis://redis:6379/0
+      - CONSUMER_NAME=worker-heavy
+      - MAX_PARALLELISM=8
+    depends_on:
+      - redis
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: "0.7"
+          memory: "80MB"
 
   health-check:
     build: .
@@ -115,7 +137,7 @@ services:
         "--appendonly",
         "no",
         "--maxclients",
-        "15000",
+        "500",
       ]
     networks:
       - backend
@@ -123,7 +145,7 @@ services:
       resources:
         limits:
           cpus: "0.1"
-          memory: "32MB"
+          memory: "64MB"
 
 networks:
   backend:

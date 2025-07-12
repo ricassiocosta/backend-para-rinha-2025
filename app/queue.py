@@ -1,13 +1,12 @@
 import os
+import orjson
 import redis.asyncio as aioredis
 from redis.exceptions import ResponseError
-import json
 from app.config import get_settings
-from app.models import PaymentRequest
 import asyncio
 
 settings = get_settings()
-redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=15000)
+redis = aioredis.from_url(settings.redis_url, decode_responses=True, max_connections=500)
 
 STREAM = "payments_stream"
 GROUP = "payment_consumers"
@@ -23,8 +22,8 @@ async def setup_stream():
         else:
             raise
 
-async def add_payment(p: PaymentRequest):
-    await redis.xadd(STREAM, {"data": p.model_dump_json()})
+async def add_payment(cid: str, amount: float):
+    await redis.xadd(STREAM, {"data": orjson.dumps({"correlationId": cid, "amount": amount})})
 
 async def consume_loop(handle_item):
     await setup_stream()
@@ -43,19 +42,19 @@ async def consume_loop(handle_item):
             groupname=GROUP,
             consumername=CONSUMER,
             streams={STREAM: ">"},
-            count=MAX_PARALLELISM,
+            count=(MAX_PARALLELISM * 2),  # Read more to allow for parallel processing
         )
 
         if not entries:
+            await asyncio.sleep(0.001)
             continue
 
-        tasks = []
-        for _, items in entries:
-            for entry_id, entry_data in items:
-                try:
+        async with asyncio.TaskGroup() as tg:
+            for _, items in entries:
+                for entry_id, entry_data in items:
                     raw = entry_data.get("data")
-                    parsed = json.loads(raw)
-                    tasks.append(handle_with_ack(entry_id, parsed))
-                except Exception as e:
-                    print(f"Erro ao decodificar item {entry_id}: {e}")
-        await asyncio.gather(*tasks)
+                    try:
+                        parsed = orjson.loads(raw)
+                        tg.create_task(handle_with_ack(entry_id, parsed))
+                    except Exception as e:
+                        print(f"Erro ao decodificar item {entry_id}: {e}")

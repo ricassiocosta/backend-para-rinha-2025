@@ -1,18 +1,17 @@
 from datetime import datetime
-from app.models import PaymentInDB
 from app.config import get_settings
-import json
+import orjson
 import redis.asyncio as aioredis
 
 settings = get_settings()
 redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
 
-async def save_payment(p: PaymentInDB):
-    payment_json = json.dumps({
-        "correlation_id": str(p.correlation_id),
-        "amount": p.amount,
-        "processor": p.processor,
-        "requested_at": p.requested_at.isoformat() if isinstance(p.requested_at, datetime) else p.requested_at,
+async def save_payment(cid: str, amount: float, processor: str, requested_at: datetime):
+    payment_json = orjson.dumps({
+        "correlation_id": cid,
+        "amount": amount,
+        "processor": processor,
+        "requested_at": requested_at.isoformat() if isinstance(requested_at, datetime) else requested_at,
     })
     await redis_client.rpush("payments", payment_json)
 
@@ -23,7 +22,7 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         "fallback": {"totalRequests": 0, "totalAmount": 0.0},
     }
     for payment_json in payments:
-        p = json.loads(payment_json)
+        p = orjson.loads(payment_json)
         requested_at = datetime.fromisoformat(p["requested_at"])
         if requested_at.tzinfo is not None:
             requested_at = requested_at.replace(tzinfo=None)

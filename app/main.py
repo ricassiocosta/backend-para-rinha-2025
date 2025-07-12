@@ -10,7 +10,7 @@ app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_
 
 @app.post("/payments", status_code=202)
 async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(add_payment, p)
+    background_tasks.add_task(add_payment, p.correlationId, p.amount)
     return {"status": "queued"}
 
 @app.get("/payments-summary")

@@ -1,13 +1,7 @@
 from uuid import UUID
-from pydantic import BaseModel, Field
-from datetime import datetime
+from pydantic import BaseModel
 
 class PaymentRequest(BaseModel):
-    correlationId: UUID = Field(..., alias="correlationId")
+    correlationId: str
     amount: float
 
-class PaymentInDB(BaseModel):
-    correlation_id: UUID
-    amount: float
-    processor: str
-    requested_at: datetime
