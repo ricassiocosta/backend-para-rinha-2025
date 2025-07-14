@@ -19,7 +19,7 @@ async def send_payment(dest: str, cid: str, amount: float, requested_at: datetim
         "amount": amount,
         "requestedAt": requested_at.isoformat(),
     }
-    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(3.0, connect=1.0))
+    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(1.5, connect=1.0))
     if r.status_code == 200:
         return True
 
@@ -40,10 +40,6 @@ async def choose_and_send(cid: str, amount: float):
     
     raise Exception(f"Failed to send payment to {healthier_gateway} for {cid}")
 
-def _is_cache_valid(ts: float) -> bool:
-    now = datetime.now().timestamp()
-    return (ts + settings.health_cache_ttl) > now
-
 async def _get_healthier_gateway() -> tuple[str, str]:
     if _LOCAL_CACHE["value"] and (datetime.now() - _LOCAL_CACHE["ts"] < 1): 
         return _LOCAL_CACHE["value"]
@@ -52,8 +48,9 @@ async def _get_healthier_gateway() -> tuple[str, str]:
     if cached:
         try:
             cached_obj = orjson.loads(cached)
-            if _is_cache_valid(cached_obj["ts"]):
-                return tuple(cached_obj["data"])
+            return tuple(cached_obj["data"])
         except Exception:
-            pass
-    raise RuntimeError("No valid gateway health data in cache")
+            raise RuntimeError("No valid gateway health data in cache")
+
+    # If cache is empty or invalid, default to the primary gateway
+    return settings.pp_default, "default"
