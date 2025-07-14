@@ -37,7 +37,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.1"
+          cpus: "0.15"
           memory: "64MB"
 
   backend-api-2:
@@ -63,7 +63,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.4"
+          cpus: "0.3"
           memory: "48MB"
 
   worker-heavy:
