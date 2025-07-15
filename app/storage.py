@@ -33,10 +33,10 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
 
     for payment_json in payments:
         p = orjson.loads(payment_json)
-        processor = p.get("processor")
-        if processor in summary:
-            summary[processor]["totalRequests"] += 1
-            summary[processor]["totalAmount"] += float(p.get("amount", 0.0))
+        processor = p["processor"]
+        amount = p["amount"]
+        summary[processor]["totalRequests"] += 1
+        summary[processor]["totalAmount"] += amount
 
     return summary
 
