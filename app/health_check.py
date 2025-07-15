@@ -21,17 +21,27 @@ def get_health(url: str) -> dict:
 def update_health_status():
     while True:
         default_health = get_health(settings.pp_default)
-        fallback_health = get_health(settings.pp_fallback)
         if not default_health["failing"] and default_health["minResponseTime"] < 120:
             cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
             redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-        elif fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 3):
+            time.sleep(5)
+            continue
+
+        if default_health["failing"]:
             cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": datetime.now().timestamp()}
             redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-        else:
-            cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
+            time.sleep(5)
+            continue
+
+        fallback_health = get_health(settings.pp_fallback)
+        if not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 3):
+            cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": datetime.now().timestamp()}
             redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-        time.sleep(5)
+            time.sleep(5)
+            continue
+
+        cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
+        redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
 
 if __name__ == "__main__":
     print("Health check service started.")
