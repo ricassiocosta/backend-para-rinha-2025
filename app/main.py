@@ -15,7 +15,12 @@ async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
 
 @app.get("/payments-summary")
 async def payments_summary(from_: str | None = Query(default=None, alias="from"), to: str | None = None):
-    return await get_summary(datetime.fromisoformat(from_), datetime.fromisoformat(to))
+    if from_ is not None:
+        from_ = datetime.fromisoformat(from_)
+    if to is not None:
+        to = datetime.fromisoformat(to)
+
+    return await get_summary(from_, to)
 
 @app.post("/purge-payments")
 async def purge_payments_endpoint():
