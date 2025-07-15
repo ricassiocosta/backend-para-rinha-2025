@@ -37,8 +37,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: "64MB"
+          cpus: "0.2"
+          memory: "75MB"
 
   backend-api-2:
     <<: *api
@@ -87,26 +87,6 @@ services:
         limits:
           cpus: "0.6"
           memory: "72MB"
-
-  health-check:
-    image: ricassiocosta/rinha-backend-2025-python:latest
-    hostname: rinha-health-check
-    command: ["python", "-m", "app.health_check"]
-    restart: unless-stopped
-    environment:
-      - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
-      - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
-    networks:
-      - backend
-      - payment-processor
-    deploy:
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: "22MB"
 
   redis:
     image: redis:7-alpine
