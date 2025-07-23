@@ -1,20 +1,19 @@
 import asyncio
 import uvicorn
 from datetime import datetime
-from fastapi import FastAPI, BackgroundTasks, Query
+from fastapi import FastAPI, Query
 from fastapi.responses import ORJSONResponse
 
-from app.queue_controller import add_payment, consume_loop
+from app.queue_worker import add_to_queue, consume_loop
 from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
-from app.processor import choose_and_send
 
 _VERSION = "v0.7.1"
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)
-async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(add_payment, p.correlationId, p.amount)
+async def queue_payment(p: PaymentRequest):
+    asyncio.create_task(add_to_queue(p.correlationId, p.amount))
     return {"status": "queued"}
 
 @app.get("/payments-summary")
@@ -31,13 +30,6 @@ async def purge_payments_endpoint():
     await purge_payments()
     return {"status": "payments purged"}
 
-async def handle_item(item: dict):
-    try:
-        await choose_and_send(item["correlationId"], item["amount"])
-    except Exception as e:
-        print(f"Error processing payment {item}: {e}")
-        raise e
-    
 if __name__ == "__main__":
     print(f"API version {_VERSION} started")
 
@@ -49,13 +41,13 @@ if __name__ == "__main__":
             reload=False,
             loop="uvloop",
             http="httptools",
-            workers=1
+            workers=1,
+            log_level="error",
         )
         server = uvicorn.Server(config)
         
         api_task = asyncio.create_task(server.serve())
-        consume_task = asyncio.create_task(consume_loop(handle_item))
-
+        consume_task = asyncio.create_task(consume_loop())
         await asyncio.gather(consume_task, api_task)
 
     asyncio.run(main())

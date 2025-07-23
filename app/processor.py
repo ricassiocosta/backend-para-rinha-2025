@@ -5,7 +5,6 @@ import redis.asyncio as aioredis
 from datetime import datetime, timezone
 
 from app.config import get_settings
-from app.storage import save_payment
 
 settings = get_settings()
 redis = aioredis.from_url(settings.redis_url, decode_responses=True)
@@ -25,22 +24,7 @@ async def send_payment(dest: str, cid: str, amount: float, requested_at: datetim
 
     return False
 
-async def choose_and_send(cid: str, amount: float):
-    try:
-        healthier_gateway, gateway_name = await _get_healthier_gateway()
-        requested_at = datetime.now(tz=timezone.utc)
-        if await send_payment(healthier_gateway, cid, amount, requested_at):
-            await save_payment(
-                cid, amount, gateway_name, requested_at
-            )
-            return
-        print(f"Failed to send payment to {healthier_gateway} for {cid}")
-    except Exception as e:
-        raise RuntimeError(f"Error while sending payment: {e}")
-    
-    raise Exception(f"Failed to send payment to {healthier_gateway} for {cid}")
-
-async def _get_healthier_gateway() -> tuple[str, str]:
+async def get_healthier_gateway() -> tuple[str, str]:
     if _LOCAL_CACHE["value"] and (datetime.now() - _LOCAL_CACHE["ts"] < 1): 
         return _LOCAL_CACHE["value"]
     
