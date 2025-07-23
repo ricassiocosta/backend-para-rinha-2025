@@ -1,7 +1,7 @@
 import asyncio
 import uvicorn
 from datetime import datetime
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, BackgroundTasks, Query
 from fastapi.responses import ORJSONResponse
 
 from app.queue_worker import add_to_queue, consume_loop
@@ -12,8 +12,8 @@ _VERSION = "v0.7.1"
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)
-async def queue_payment(p: PaymentRequest):
-    asyncio.create_task(add_to_queue(p.correlationId, p.amount))
+async def queue_payment(p: PaymentRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(add_to_queue, p.correlationId, p.amount)
     return {"status": "queued"}
 
 @app.get("/payments-summary")

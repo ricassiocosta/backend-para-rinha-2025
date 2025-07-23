@@ -12,7 +12,6 @@ settings = get_settings()
 redis = aioredis.from_url(settings.redis_url, decode_responses=False)
 
 PENDING_QUEUE = "payments_pending"
-PROCESSING_QUEUE = "payments_processing"
 MAX_PARALLELISM = int(os.getenv("MAX_PARALLELISM", 2))
 
 async def add_to_queue(cid: str, amount: float):
@@ -40,7 +39,7 @@ async def _worker(worker_id: int):
                 )
             except Exception as e:
                 print(f"[ERRO] Worker {worker_id}: {e}. Sending back to queue.")
-                asyncio.create_task(redis.lpush(PENDING_QUEUE, raw))
+                await redis.lpush(PENDING_QUEUE, raw)
 
         except Exception as e:
             print(f"[ERRO] Worker {worker_id} {e}")
