@@ -8,7 +8,7 @@ from app.queue_worker import add_to_queue, consume_loop
 from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
 
-_VERSION = "v0.7.1"
+_VERSION = "v0.8.7"
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)

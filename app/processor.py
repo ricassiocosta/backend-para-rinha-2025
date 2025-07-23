@@ -2,7 +2,7 @@ import httpx
 import orjson
 import redis.asyncio as aioredis
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.config import get_settings
 

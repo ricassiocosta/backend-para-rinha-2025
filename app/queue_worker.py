@@ -12,7 +12,10 @@ settings = get_settings()
 redis = aioredis.from_url(settings.redis_url, decode_responses=False)
 
 PENDING_QUEUE = "payments_pending"
+FAILED_QUEUE = "payments_failed"
 MAX_PARALLELISM = int(os.getenv("MAX_PARALLELISM", 2))
+
+_FAILED_ITEMS = asyncio.Queue()
 
 async def add_to_queue(cid: str, amount: float):
     data = orjson.dumps({"correlationId": cid, "amount": amount}).decode()
@@ -22,8 +25,11 @@ async def _worker(worker_id: int):
     while True:
         requested_at = datetime.now(tz=timezone.utc)
         try:
-            result = await redis.blpop(PENDING_QUEUE, timeout=0)
-            _, raw = result
+            if not _FAILED_ITEMS.empty():
+                raw = await _FAILED_ITEMS.get()
+            else:
+                result = await redis.blpop(PENDING_QUEUE, timeout=0)
+                _, raw = result
 
             try:
                 item = orjson.loads(raw)
@@ -39,7 +45,12 @@ async def _worker(worker_id: int):
                 )
             except Exception as e:
                 print(f"[ERRO] Worker {worker_id}: {e}. Sending back to queue.")
-                await redis.lpush(PENDING_QUEUE, raw)
+                await _FAILED_ITEMS.put(raw)
+
+                # # If the item fails, we push it to a failed queue for later processing
+                # asyncio.create_task(
+                #     redis.rpush(FAILED_QUEUE, raw)
+                # )
 
         except Exception as e:
             print(f"[ERRO] Worker {worker_id} {e}")
