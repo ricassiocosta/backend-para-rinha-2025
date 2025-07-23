@@ -19,7 +19,7 @@ async def send_payment(dest: str, cid: str, amount: float, requested_at: datetim
         "amount": amount,
         "requestedAt": requested_at.isoformat(),
     }
-    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(30, connect=1.0))
+    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(10, connect=1.0))
     if r.status_code == 200:
         return True
 
