@@ -27,7 +27,7 @@ services:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
       - REDIS_URL=redis://redis:6379/0
-      - MAX_PARALLELISM=12
+      - MAX_PARALLELISM=10
     depends_on:
       - redis
     networks:
