@@ -1,14 +1,15 @@
 import asyncio
 import uvicorn
+
 from datetime import datetime
 from fastapi import FastAPI, BackgroundTasks, Query
 from fastapi.responses import ORJSONResponse
 
-from app.queue_worker import add_to_queue, consume_loop
+from app.storage import add_to_queue
 from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
+from app.config import get_version
 
-_VERSION = "v0.8.7"
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)
@@ -31,23 +32,18 @@ async def purge_payments_endpoint():
     return {"status": "payments purged"}
 
 if __name__ == "__main__":
-    print(f"API version {_VERSION} started")
+    print(f"API version {get_version()} started")
 
-    async def main():
-        config = uvicorn.Config(
-            "app.main:app",
-            host="0.0.0.0",
-            port=9999,
-            reload=False,
-            loop="uvloop",
-            http="httptools",
-            workers=1,
-            log_level="error",
-        )
-        server = uvicorn.Server(config)
-        
-        api_task = asyncio.create_task(server.serve())
-        consume_task = asyncio.create_task(consume_loop())
-        await asyncio.gather(consume_task, api_task)
+    config = uvicorn.Config(
+        "app.api:app",
+        host="0.0.0.0",
+        port=9999,
+        reload=False,
+        loop="uvloop",
+        http="httptools",
+        workers=1,
+        log_level="error",
+    )
 
-    asyncio.run(main())
+    server = uvicorn.Server(config)
+    asyncio.run(server.serve())

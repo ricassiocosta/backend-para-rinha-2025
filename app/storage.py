@@ -1,12 +1,18 @@
-from datetime import datetime
-from app.config import get_settings
 import orjson
 import redis.asyncio as aioredis
+
+from datetime import datetime
+
+from app.config import get_settings
 
 settings = get_settings()
 redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
 
 ZSET_KEY = "payments_by_date"
+
+async def add_to_queue(cid: str, amount: float):
+    data = orjson.dumps({"correlationId": cid, "amount": amount}).decode()
+    await redis_client.lpush(settings.PENDING_QUEUE, data)
 
 async def save_payment(cid: str, amount: float, processor: str, requested_at: datetime):
     timestamp = requested_at.timestamp() if isinstance(requested_at, datetime) else float(requested_at)

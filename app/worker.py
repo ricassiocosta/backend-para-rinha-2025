@@ -1,35 +1,25 @@
 import os
 import orjson
-import redis.asyncio as aioredis
 import asyncio
+import redis.asyncio as aioredis
+
 from datetime import datetime, timezone
 
-from app.config import get_settings
+from app.config import get_settings, get_version
 from app.processor import get_healthier_gateway, send_payment
 from app.storage import save_payment
 
 settings = get_settings()
-redis = aioredis.from_url(settings.redis_url, decode_responses=False)
+redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
 
-PENDING_QUEUE = "payments_pending"
-FAILED_QUEUE = "payments_failed"
 MAX_PARALLELISM = int(os.getenv("MAX_PARALLELISM", 2))
-
-_FAILED_ITEMS = asyncio.Queue()
-
-async def add_to_queue(cid: str, amount: float):
-    data = orjson.dumps({"correlationId": cid, "amount": amount}).decode()
-    await redis.lpush(PENDING_QUEUE, data)
 
 async def _worker(worker_id: int):
     while True:
         requested_at = datetime.now(tz=timezone.utc)
         try:
-            if not _FAILED_ITEMS.empty():
-                raw = await _FAILED_ITEMS.get()
-            else:
-                result = await redis.blpop(PENDING_QUEUE, timeout=0)
-                _, raw = result
+            result = await redis_client.blpop(settings.PENDING_QUEUE, timeout=0)
+            _, raw = result
 
             try:
                 item = orjson.loads(raw)
@@ -45,12 +35,9 @@ async def _worker(worker_id: int):
                 )
             except Exception as e:
                 print(f"[ERRO] Worker {worker_id}: {e}. Sending back to queue.")
-                await _FAILED_ITEMS.put(raw)
-
-                # # If the item fails, we push it to a failed queue for later processing
-                # asyncio.create_task(
-                #     redis.rpush(FAILED_QUEUE, raw)
-                # )
+                asyncio.create_task(
+                    redis_client.rpush(settings.PENDING_QUEUE, raw)
+                )
 
         except Exception as e:
             print(f"[ERRO] Worker {worker_id} {e}")
@@ -58,3 +45,7 @@ async def _worker(worker_id: int):
 async def consume_loop():
     tasks = [asyncio.create_task(_worker(i)) for i in range(MAX_PARALLELISM)]
     await asyncio.gather(*tasks)
+
+if __name__ == "__main__":
+    print(f"Worker version {get_version()} started")
+    asyncio.run(consume_loop())

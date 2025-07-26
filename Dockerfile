@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
 COPY app ./app
 
 EXPOSE 9999
-CMD ["python", "-m", "app.main"]
+CMD ["python", "-m", "app.api"]

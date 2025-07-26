@@ -10,7 +10,10 @@ settings = get_settings()
 redis = aioredis.from_url(settings.redis_url, decode_responses=True)
 _CACHE_KEY = "gateway_status"
 _LOCAL_CACHE = {"ts": 0, "value": None}
-client = httpx.AsyncClient()
+client = httpx.AsyncClient(
+    limits=httpx.Limits(max_connections=100, max_keepalive_connections=100),
+    timeout=httpx.Timeout(10, connect=0.5)
+)
 
 async def send_payment(dest: str, cid: str, amount: float, requested_at: datetime) -> bool:
     payload = {
@@ -18,7 +21,7 @@ async def send_payment(dest: str, cid: str, amount: float, requested_at: datetim
         "amount": amount,
         "requestedAt": requested_at.isoformat(),
     }
-    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(10, connect=1.0))
+    r = await client.post(f"{dest}/payments", json=payload)
     if r.status_code == 200:
         return True
 

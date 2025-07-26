@@ -1,9 +1,12 @@
-import requests
-from datetime import datetime
-from app.config import get_settings
+import time
 import redis
 import orjson
-import time
+import asyncio
+import requests
+
+from datetime import datetime
+
+from app.config import get_settings
 
 settings = get_settings()
 redis = redis.from_url(settings.redis_url, decode_responses=False)
@@ -18,7 +21,7 @@ def get_health(url: str) -> dict:
         data = {"failing": True, "minResponseTime": 10_000}
     return data
 
-def update_health_status():
+async def update_health_status():
     while True:
         default_health = get_health(settings.pp_default)
         if not default_health["failing"] and default_health["minResponseTime"] < 120:
@@ -45,8 +48,9 @@ def update_health_status():
 
 if __name__ == "__main__":
     print("Health check service started.")
+    
     # Initialize cache with default values
     cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
     redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
 
-    update_health_status()
+    asyncio.run(update_health_status())
