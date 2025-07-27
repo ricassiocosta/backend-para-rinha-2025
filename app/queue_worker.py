@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timezone
 
 from app.config import get_settings
-from app.processor import get_healthier_gateway, send_payment
+from app.client import get_healthier_gateway, send_payment
 from app.storage import save_payment
 
 settings = get_settings()
@@ -12,17 +12,17 @@ PENDING_QUEUE = "payments_pending"
 FAILED_QUEUE = "payments_failed"
 MAX_PARALLELISM = int(os.getenv("MAX_PARALLELISM", 2))
 
-local_queue = asyncio.Queue(maxsize=50000)
+payments_queue = asyncio.Queue(maxsize=50000)
 
 async def add_to_queue(cid: str, amount: float):
     data = {"correlationId": cid, "amount": amount}
-    await local_queue.put(data)
+    await payments_queue.put(data)
 
 async def _worker(worker_id: int):
     while True:
         requested_at = datetime.now(tz=timezone.utc)
         try:
-            item = await local_queue.get()
+            item = await payments_queue.get()
 
             try:
                 healthier_gateway, gateway_name = await get_healthier_gateway()
@@ -35,7 +35,7 @@ async def _worker(worker_id: int):
                 )
             except Exception as e:
                 print(f"[ERRO] Worker {worker_id}: {e}. Sending back to queue.")
-                await local_queue.put(item)
+                await payments_queue.put(item)
 
         except Exception as e:
             print(f"[ERRO] Worker {worker_id} {e}")

@@ -1,52 +1,85 @@
-import requests
-from datetime import datetime
-from app.config import get_settings
+import asyncio
+import uuid
 import redis
 import orjson
-import time
+
+from redis import Redis
+from datetime import datetime
+
+from app.config import get_settings
+from app.client import get_health
 
 settings = get_settings()
-redis = redis.from_url(settings.redis_url, decode_responses=False)
+
 _CACHE_KEY = "gateway_status"
+_REDIS_KEY = "leader_lock"
+_LOCK_TTL = 5000  # 5 seconds
+_RENEW_INTERVAL = 3  # 3 seconds
 
-def get_health(url: str) -> dict:
-    try:
-        print(f"Checking health of {url} at {datetime.now()}")
-        resp = requests.get(f"{url}/payments/service-health", timeout=0.5)
-        data = resp.json()
-    except Exception:
-        data = {"failing": True, "minResponseTime": 10_000}
-    return data
+redis = redis.from_url(settings.redis_url, decode_responses=False)
 
-def update_health_status():
-    while True:
-        default_health = get_health(settings.pp_default)
-        if not default_health["failing"] and default_health["minResponseTime"] < 120:
-            cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
-            redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-            time.sleep(5)
-            continue
+class PaymentGatewayHealthService:
+    def __init__(self, redis_client: Redis, lock_key: str, lock_ttl: int):
+        self.redis = redis_client
+        self.lock_key = lock_key
+        self.lock_ttl = lock_ttl
+        self.instance_id = str(uuid.uuid4())
+        self._is_leader = False
 
-        if default_health["failing"]:
-            cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": datetime.now().timestamp()}
-            redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-            time.sleep(5)
-            continue
+    def try_acquire_lock(self):
+        return self.redis.set(
+            self.lock_key,
+            self.instance_id,
+            nx=True,
+            px=self.lock_ttl
+        )
 
-        fallback_health = get_health(settings.pp_fallback)
-        if not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 3):
-            cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": datetime.now().timestamp()}
-            redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-            time.sleep(5)
-            continue
+    def is_still_leader(self):
+        val = self.redis.get(self.lock_key)
+        return val and val.decode() == self.instance_id
 
-        cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
-        redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+    def renew_lock(self):
+        if self.is_still_leader():
+            self.redis.pexpire(self.lock_key, self.lock_ttl)
 
-if __name__ == "__main__":
+    async def start(self):
+        while True:
+            if not self._is_leader:
+                acquired = self.try_acquire_lock()
+                if acquired:
+                    self._is_leader = True
+                    asyncio.create_task(self.health_check_loop())
+            else:
+                self.renew_lock()
+            await asyncio.sleep(_RENEW_INTERVAL)
+
+    async def health_check_loop(self):
+        while self._is_leader:
+            default_health = await get_health(settings.pp_default)
+            checked_at = datetime.now().timestamp()
+            if not default_health["failing"] and default_health["minResponseTime"] < 120:
+                cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+
+            if default_health["failing"]:
+                cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+
+            fallback_health = await get_health(settings.pp_fallback)
+            checked_at = datetime.now().timestamp()
+            if not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 2):
+                cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+            else:
+                cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+
+            await asyncio.sleep(5)
+            if not self.is_still_leader():
+                self._is_leader = False
+                break
+
+async def gateway_health_check_service():
     print("Health check service started.")
-    # Initialize cache with default values
-    cache_obj = {"data": (settings.pp_default, "default"), "ts": datetime.now().timestamp()}
-    redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
-
-    update_health_status()
+    ps = PaymentGatewayHealthService(redis, _REDIS_KEY, _LOCK_TTL)
+    await ps.start()
