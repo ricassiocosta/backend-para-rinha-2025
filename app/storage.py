@@ -38,6 +38,9 @@ def get_summary(ts_from: datetime | None, ts_to: datetime | None):
         summary[processor]["totalRequests"] += 1
         summary[processor]["totalAmount"] += amount
 
+    for key in summary:
+        summary[key]["totalAmount"] = round(summary[key]["totalAmount"], 1)
+
     return summary
 
 def purge_payments():

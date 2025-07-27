@@ -55,24 +55,27 @@ class PaymentGatewayHealthService:
 
     async def health_check_loop(self):
         while self._is_leader:
-            default_health = await get_health(settings.pp_default)
-            checked_at = datetime.now().timestamp()
-            if not default_health["failing"] and default_health["minResponseTime"] < 120:
-                cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+            default_health, fallback_health = await asyncio.gather(
+                get_health(settings.pp_default),
+                get_health(settings.pp_fallback)
+            )
 
+            checked_at = datetime.now().timestamp()
             if default_health["failing"]:
                 cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+            
+            elif default_health["minResponseTime"] < 120:
+                cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
 
-            fallback_health = await get_health(settings.pp_fallback)
-            checked_at = datetime.now().timestamp()
-            if not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 2):
+            elif not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 2):
                 cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+
             else:
                 cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj), ex=settings.health_cache_ttl)
+                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
 
             await asyncio.sleep(5)
             if not self.is_still_leader():
