@@ -80,6 +80,5 @@ class PaymentGatewayHealthService:
                 break
 
 async def gateway_health_check_service():
-    print("Health check service started.")
     ps = PaymentGatewayHealthService(redis, _REDIS_KEY, _LOCK_TTL)
     await ps.start()

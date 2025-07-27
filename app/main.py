@@ -23,11 +23,11 @@ async def payments_summary(from_: str | None = Query(default=None, alias="from")
     if to is not None:
         to = datetime.fromisoformat(to)
 
-    return await get_summary(from_, to)
+    return get_summary(from_, to)
 
 @app.post("/purge-payments")
 async def purge_payments_endpoint():
-    await purge_payments()
+    purge_payments()
     return {"status": "payments purged"}
 
 if __name__ == "__main__":

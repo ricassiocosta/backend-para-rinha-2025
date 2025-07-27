@@ -30,7 +30,7 @@ async def _worker(worker_id: int):
                 if not await send_payment(healthier_gateway, item["correlationId"], item["amount"], requested_at):
                     raise RuntimeError(f"Failed to send payment for {item['correlationId']} to {healthier_gateway}")
 
-                await save_payment(
+                save_payment(
                     item["correlationId"], item["amount"], gateway_name, requested_at
                 )
             except Exception as e:

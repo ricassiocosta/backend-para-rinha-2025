@@ -8,7 +8,7 @@ redis_client = redis.from_url(settings.redis_url, decode_responses=False)
 
 ZSET_KEY = "payments_by_date"
 
-async def save_payment(cid: str, amount: float, processor: str, requested_at: datetime):
+def save_payment(cid: str, amount: float, processor: str, requested_at: datetime):
     timestamp = requested_at.timestamp() if isinstance(requested_at, datetime) else float(requested_at)
 
     payment_json = orjson.dumps({
@@ -20,7 +20,7 @@ async def save_payment(cid: str, amount: float, processor: str, requested_at: da
 
     redis_client.zadd(ZSET_KEY, {payment_json: timestamp})
 
-async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
+def get_summary(ts_from: datetime | None, ts_to: datetime | None):
     min_score = ts_from.timestamp() if ts_from else "-inf"
     max_score = ts_to.timestamp() if ts_to else "+inf"
 
@@ -40,5 +40,5 @@ async def get_summary(ts_from: datetime | None, ts_to: datetime | None):
 
     return summary
 
-async def purge_payments():
+def purge_payments():
     redis_client.delete(ZSET_KEY)
