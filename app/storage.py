@@ -4,7 +4,14 @@ import orjson
 import redis
 
 settings = get_settings()
-redis_client = redis.from_url(settings.redis_url, decode_responses=False)
+
+redis_pool = redis.ConnectionPool(
+    connection_class=redis.UnixDomainSocketConnection,
+    path="/var/run/redis/redis.sock",
+    max_connections=100,
+)
+
+redis_client = redis.Redis(connection_pool=redis_pool)
 
 ZSET_KEY = "payments_by_date"
 

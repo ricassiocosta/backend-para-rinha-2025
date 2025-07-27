@@ -9,7 +9,7 @@ from app.models import PaymentRequest
 from app.storage import get_summary, purge_payments
 from app.health_check import gateway_health_check_service 
 
-_VERSION = "v0.10.0"
+_VERSION = "v0.10.1"
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, default_response_class=ORJSONResponse)
 
 @app.post("/payments", status_code=202)

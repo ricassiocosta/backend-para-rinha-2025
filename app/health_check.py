@@ -8,6 +8,7 @@ from datetime import datetime
 
 from app.config import get_settings
 from app.client import get_health
+from app.storage import redis_client
 
 settings = get_settings()
 
@@ -15,8 +16,6 @@ _CACHE_KEY = "gateway_status"
 _REDIS_KEY = "leader_lock"
 _LOCK_TTL = 5000  # 5 seconds
 _RENEW_INTERVAL = 3  # 3 seconds
-
-redis = redis.from_url(settings.redis_url, decode_responses=False)
 
 class PaymentGatewayHealthService:
     def __init__(self, redis_client: Redis, lock_key: str, lock_ttl: int):
@@ -63,19 +62,19 @@ class PaymentGatewayHealthService:
             checked_at = datetime.now().timestamp()
             if default_health["failing"]:
                 cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+                redis_client.set(_CACHE_KEY, orjson.dumps(cache_obj))
             
             elif default_health["minResponseTime"] < 120:
                 cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+                redis_client.set(_CACHE_KEY, orjson.dumps(cache_obj))
 
             elif not fallback_health["failing"] and fallback_health["minResponseTime"] < (default_health["minResponseTime"] * 2):
                 cache_obj = {"data": (settings.pp_fallback, "fallback"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+                redis_client.set(_CACHE_KEY, orjson.dumps(cache_obj))
 
             else:
                 cache_obj = {"data": (settings.pp_default, "default"), "ts": checked_at}
-                redis.set(_CACHE_KEY, orjson.dumps(cache_obj))
+                redis_client.set(_CACHE_KEY, orjson.dumps(cache_obj))
 
             await asyncio.sleep(5)
             if not self.is_still_leader():
@@ -83,5 +82,5 @@ class PaymentGatewayHealthService:
                 break
 
 async def gateway_health_check_service():
-    ps = PaymentGatewayHealthService(redis, _REDIS_KEY, _LOCK_TTL)
+    ps = PaymentGatewayHealthService(redis_client, _REDIS_KEY, _LOCK_TTL)
     await ps.start()

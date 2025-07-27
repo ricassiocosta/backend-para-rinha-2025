@@ -5,20 +5,23 @@ import redis
 from datetime import datetime
 
 from app.config import get_settings
+from app.storage import redis_client
 
 settings = get_settings()
-redis = redis.from_url(settings.redis_url, decode_responses=True)
 _CACHE_KEY = "gateway_status"
 
 local_cache = {
     "cache": None
 }
 
-client = httpx.AsyncClient()
+client = httpx.AsyncClient(
+    limits=httpx.Limits(max_connections=100, max_keepalive_connections=50),
+    timeout=httpx.Timeout(5.0, connect=1.0)
+)
 
 async def get_health(url: str) -> dict:
     try:
-        resp = await client.get(f"{url}/payments/service-health", timeout=httpx.Timeout(1.0))
+        resp = await client.get(f"{url}/payments/service-health")
         if resp.status_code != 200:
             return {"failing": True, "minResponseTime": 10_000}
 
@@ -35,7 +38,7 @@ async def send_payment(dest: str, cid: str, amount: float, requested_at: datetim
         "amount": amount,
         "requestedAt": requested_at.isoformat(),
     }
-    r = await client.post(f"{dest}/payments", json=payload, timeout=httpx.Timeout(30, connect=1.0))
+    r = await client.post(f"{dest}/payments", json=payload)
     if r.status_code == 200:
         return True
 
@@ -45,7 +48,7 @@ async def get_healthier_gateway() -> tuple[str, str]:
     if local_cache["cache"] and (datetime.now().timestamp() - local_cache["cache"]["ts"] < 5):
         return local_cache["cache"]["data"]
 
-    cached = redis.get(_CACHE_KEY)
+    cached = redis_client.get(_CACHE_KEY)
     if cached:
         try:
             cached_obj = orjson.loads(cached)
